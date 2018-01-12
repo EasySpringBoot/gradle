@@ -37,7 +37,6 @@ import org.gradle.internal.component.model.ModuleSource;
 import org.gradle.internal.hash.HashValue;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +60,7 @@ abstract class AbstractModuleComponentResolveMetadata implements ModuleComponent
     // Configurations are built on-demand, but only once.
     private final Map<String, DefaultConfigurationMetadata> configurations = Maps.newHashMap();
     private ImmutableList<? extends ConfigurationMetadata> graphVariants;
+    private boolean requiresAttributeMatching;
 
     AbstractModuleComponentResolveMetadata(AbstractMutableModuleComponentResolveMetadata metadata) {
         this.componentIdentifier = metadata.getComponentId();
@@ -161,14 +161,29 @@ abstract class AbstractModuleComponentResolveMetadata implements ModuleComponent
     }
 
     private ImmutableList<? extends ConfigurationMetadata> buildVariantsForGraphTraversal(List<? extends ComponentVariant> variants) {
-        if (variants.isEmpty()) {
-            return maybeDeriveVariants();
+        if (!variants.isEmpty()) {
+            ImmutableList.Builder<ConfigurationMetadata> configurations = ImmutableList.builder();
+            for (ComponentVariant variant : variants) {
+                configurations.add(new VariantBackedConfigurationMetadata(getComponentId(), variant, attributes, attributesFactory, variantMetadataRules));
+            }
+            requiresAttributeMatching = true;
+            return configurations.build();
         }
-        List<VariantBackedConfigurationMetadata> configurations = new ArrayList<VariantBackedConfigurationMetadata>(variants.size());
-        for (ComponentVariant variant : variants) {
-            configurations.add(new VariantBackedConfigurationMetadata(getComponentId(), variant, attributes, attributesFactory, variantMetadataRules));
+        ImmutableList<? extends ConfigurationMetadata> deriveVariants = maybeDeriveVariants();
+        if (!deriveVariants.isEmpty()) {
+            requiresAttributeMatching = true;
+            return deriveVariants;
         }
-        return ImmutableList.copyOf(configurations);
+        //fallback to treating all available configurations as variants
+        ImmutableList.Builder<ConfigurationMetadata> configurations = ImmutableList.builder();
+        for (String conf : getConfigurationNames()) {
+            ConfigurationMetadata configuration = getConfiguration(conf);
+            if (configuration != null) {
+                configurations.add(configuration);
+            }
+        }
+        requiresAttributeMatching = false;
+        return configurations.build();
     }
 
     @Nullable
@@ -225,6 +240,14 @@ abstract class AbstractModuleComponentResolveMetadata implements ModuleComponent
     @Override
     public ImmutableList<? extends ComponentVariant> getVariants() {
         return variants;
+    }
+
+    @Override
+    public boolean requiresAttributeMatching() {
+        if (graphVariants == null) {
+            graphVariants = buildVariantsForGraphTraversal(variants);
+        }
+        return requiresAttributeMatching;
     }
 
     @Override

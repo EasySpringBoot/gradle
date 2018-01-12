@@ -169,14 +169,14 @@ class VariantAttributesRulesIntegrationTest extends AbstractModuleDependencyReso
                             if (GradleMetadataResolveRunner.useIvy()) {
                                 // Ivy doesn't derive any variant
                                 expectedTargetVariant = 'runtime'
-                                expectedAttributes = [:]
+                                expectedAttributes = ['org.gradle.status': 'integration']
                             } else {
                                 // for Maven, we derive variants for compile/runtime. Variants are then used during selection, and are subject
                                 // to metadata rules. In this case, we have multiple variants (default, runtime, compile), but only the "compile"
                                 // one is target of the rule (see #getVariantToTest())
                                 expectedTargetVariant = 'compile'
                                 // the format attribute is added by the rule
-                                expectedAttributes = [format: 'custom']
+                                expectedAttributes = ['org.gradle.status': 'release', format: 'custom']
                                 if (GradleMetadataResolveRunner.experimentalResolveBehaviorEnabled) {
                                     // when experimental resolve is on, the "compile" configuration is mapped to the "java-api" usage
                                     expectedAttributes['org.gradle.usage'] = 'java-api'

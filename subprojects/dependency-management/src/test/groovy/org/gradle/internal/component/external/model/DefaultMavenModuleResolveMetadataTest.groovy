@@ -142,12 +142,13 @@ class DefaultMavenModuleResolveMetadataTest extends AbstractModuleComponentResol
         def immutableMetadata = metadata.asImmutable()
         def compileConf = immutableMetadata.getConfiguration("compile")
         def runtimeConf = immutableMetadata.getConfiguration("runtime")
+        def requiresAttributeMatching = immutableMetadata.requiresAttributeMatching()
         def variantsForGraphTraversal = immutableMetadata.getVariantsForGraphTraversal()
 
         then:
         compileConf.attributes.keySet().size() == 1 //org.gradle.status
         runtimeConf.attributes.keySet().size() == 1 //org.gradle.status
-        isJavaLibrary ? variantsForGraphTraversal.size() == 2 : variantsForGraphTraversal.empty
+        isJavaLibrary? requiresAttributeMatching && variantsForGraphTraversal.size() == 2 : !requiresAttributeMatching && variantsForGraphTraversal.size() == 10
 
         if (isJavaLibrary) {
             assert variantsForGraphTraversal[0].name == "compile"
