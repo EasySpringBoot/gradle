@@ -17,6 +17,7 @@
 package org.gradle.internal.component.model;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.HasAttributes;
@@ -75,7 +76,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
     private final ImmutableAttributes requested;
     private final List<? extends T> candidates;
 
-    private final Attribute<?>[] allAttributes;
+    private final ImmutableList<Attribute<?>> allAttributes;
     private final BitSet compatible;
     private Object[] attributeValues;
 
@@ -88,8 +89,13 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
         this.schema = schema;
         this.requested = requested;
         this.candidates = (candidates instanceof List) ? (List<? extends T>) candidates : ImmutableList.copyOf(candidates);
-        this.allAttributes = schema.getAttributes().toArray(new Attribute<?>[0]);
-        attributeValues = new Object[initialTableSize(candidates.size(), allAttributes.length, requested.keySet().size())];
+        ImmutableSet.Builder<Attribute<?>> attributes = ImmutableSet.builder();
+        attributes.addAll(requested.keySet());
+        for (T candidate : candidates) {
+            attributes.addAll(candidate.getAttributes().keySet());
+        }
+        this.allAttributes = attributes.build().asList();
+        attributeValues = new Object[initialTableSize(candidates.size(), allAttributes.size(), requested.keySet().size())];
         compatible = new BitSet(candidates.size());
         compatible.set(0, candidates.size());
     }
@@ -107,8 +113,8 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
     }
 
     private void fillRequestedValues() {
-        for (int a = 0; a < allAttributes.length; a++) {
-            Attribute<?> attribute = allAttributes[a];
+        for (int a = 0; a < allAttributes.size(); a++) {
+            Attribute<?> attribute = allAttributes.get(a);
             AttributeValue<?> attributeValue = requested.findEntry(attribute);
             setRequestedValue(a, attributeValue.isPresent() ? attributeValue.get() : null);
         }
@@ -124,7 +130,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
         int matchLength = 0;
         ImmutableAttributes candidateAttributes = ((AttributeContainerInternal) candidates.get(c).getAttributes()).asImmutable();
 
-        for (int a = 0; a < allAttributes.length; a++) {
+        for (int a = 0; a < allAttributes.size(); a++) {
             MatchResult result = recordAndMatchCandidateValue(c, a, candidateAttributes);
             if (result == MatchResult.NO_MATCH) {
                 return;
@@ -142,7 +148,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
 
     private MatchResult recordAndMatchCandidateValue(int c, int a, ImmutableAttributes candidateAttributes) {
         Object requestedValue = getRequestedValue(a);
-        Attribute<?> attribute = allAttributes[a];
+        Attribute<?> attribute = allAttributes.get(a);
         AttributeValue<?> candidateValue = candidateAttributes.findEntry(attribute.getName());
 
         if (!candidateValue.isPresent()) {
@@ -172,7 +178,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
                 continue;
             }
             int lengthOfOtherMatch = 0;
-            for (int a = 0; a < allAttributes.length; a++) {
+            for (int a = 0; a < allAttributes.size(); a++) {
                 if (getRequestedValue(a) == null) {
                     continue;
                 }
@@ -196,7 +202,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
         remaining = new BitSet(candidates.size());
         remaining.or(compatible);
 
-        for (int a = 0; a < allAttributes.length; a++) {
+        for (int a = 0; a < allAttributes.size(); a++) {
             disambiguateAttribute(a);
 
             if (remaining.cardinality() == 0) {
@@ -212,7 +218,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
             return;
         }
 
-        Set<Object> matches = schema.disambiguate(allAttributes[a], getRequestedValue(a), candidateValues);
+        Set<Object> matches = schema.disambiguate(allAttributes.get(a), getRequestedValue(a), candidateValues);
         removeCandidatesWithValueNotIn(a, matches);
     }
 
@@ -265,7 +271,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
     }
 
     private int getValueIndex(int c, int a) {
-        return (1 + c - reusedSlotsBefore(c)) * allAttributes.length + a;
+        return (1 + c - reusedSlotsBefore(c)) * allAttributes.size() + a;
     }
 
     /**
@@ -281,7 +287,7 @@ class MultipleCandidateMatcher<T extends HasAttributes> {
 
     private void ensureTableSize(int index) {
         if (attributeValues.length <= index) {
-            Object[] newTable = new Object[fullTableSize(candidates.size(), allAttributes.length)];
+            Object[] newTable = new Object[fullTableSize(candidates.size(), allAttributes.size())];
             System.arraycopy(attributeValues, 0, newTable, 0, attributeValues.length);
             attributeValues = newTable;
         }

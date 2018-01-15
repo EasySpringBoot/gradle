@@ -17,7 +17,6 @@
 package org.gradle.api.internal.attributes;
 
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import org.gradle.api.Action;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.attributes.AttributeMatchingStrategy;
@@ -226,11 +225,6 @@ public class DefaultAttributesSchema implements AttributesSchemaInternal, Attrib
             }
 
             return false;
-        }
-
-        @Override
-        public Set<Attribute<?>> getAttributes() {
-            return Sets.union(DefaultAttributesSchema.this.getAttributes(), producerSchema.getAttributes());
         }
     }
 }
